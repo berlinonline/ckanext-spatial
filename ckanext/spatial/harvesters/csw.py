@@ -65,6 +65,9 @@ class CSWHarvester(SpatialHarvester, SingletonPlugin):
     def get_constraints(self):
         return []
 
+    def get_timeout(self):
+        return 10
+
     def gather_stage(self, harvest_job):
         log = logging.getLogger(__name__ + '.CSW.gather')
         log.debug('CswHarvester gather_stage for job: %r', harvest_job)
@@ -194,5 +197,5 @@ class CSWHarvester(SpatialHarvester, SingletonPlugin):
         return True
 
     def _setup_csw_client(self, url):
-        self.csw = CswService(url)
+        self.csw = CswService(url, self.get_timeout())
 
