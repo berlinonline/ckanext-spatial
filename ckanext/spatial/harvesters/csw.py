@@ -172,7 +172,8 @@ class CSWHarvester(SpatialHarvester, SingletonPlugin):
         try:
             record = self.csw.getrecordbyid([identifier], outputschema=self.output_schema())
         except Exception, e:
-            self._save_object_error('Error getting the CSW record with GUID %s' % (identifier, e), harvest_object)
+            self._save_object_error('Error getting the CSW record with GUID %s: %r' % \
+                                    (identifier, str(e)), harvest_object)
             return False
 
         if record is None:
