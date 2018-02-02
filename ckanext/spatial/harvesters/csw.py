@@ -98,30 +98,52 @@ class CSWHarvester(SpatialHarvester, SingletonPlugin):
         # extract cql filter if any
         cql = self.source_config.get('cql')
 
-        log.debug('Starting gathering for %s' % url)
-        guids_in_harvest = set()
-        try:
-            for identifier in self.csw.getidentifiers(page=10, outputschema=self.output_schema(), cql=cql, constraints=self.get_constraints(harvest_job)):
-                try:
-                    log.info('Got identifier %s from the CSW', identifier)
-                    if identifier is None:
-                        log.error('CSW returned identifier %r, skipping...' % identifier)
+        def get_identifiers(constraints=[]):
+            guid_set = set()
+            try:
+                for identifier in self.csw.getidentifiers(page=10, outputschema=self.output_schema(), cql=cql, constraints=constraints):
+                    try:
+                        log.info('Got identifier %s from the CSW', identifier)
+                        if identifier is None:
+                            log.error('CSW returned identifier %r, skipping...' % identifier)
+                            continue
+
+                        guid_set.add(identifier)
+                    except Exception, e:
+                        self._save_gather_error('Error for the identifier %s [%r]' % (identifier,e), harvest_job)
                         continue
 
-                    guids_in_harvest.add(identifier)
-                except Exception, e:
-                    self._save_gather_error('Error for the identifier %s [%r]' % (identifier,e), harvest_job)
-                    continue
+            except Exception, e:
+                log.error('Exception: %s' % text_traceback())
+                self._save_gather_error('Error gathering the identifiers from the CSW server [%s]' % str(e), harvest_job)
+                return None
 
+            return guid_set
 
-        except Exception, e:
-            log.error('Exception: %s' % text_traceback())
-            self._save_gather_error('Error gathering the identifiers from the CSW server [%s]' % str(e), harvest_job)
-            return None
+        # first get the (date)constrained set of identifiers,
+        # to figure what was added and/or changed
+        # only those identifiers will be fetched
+        log.debug('Starting gathering for %s (constrained)' % url)
+        constraints = self.get_constraints(harvest_job)        
+        guids_in_harvest_constrained = get_identifiers(constraints)
 
-        new = guids_in_harvest - guids_in_db
-        delete = guids_in_db - guids_in_harvest
-        change = guids_in_db & guids_in_harvest
+        # then get the complete set of identifiers, to figure out
+        # what was deleted
+        log.debug('Starting gathering for %s (unconstrained)' % url)
+        guids_in_harvest_complete = set()
+        if (constraints == []):
+            log.debug('There were no constraints, so GUIDS(unconstrained) == GUIDs(constrained)')
+            guids_in_harvest_complete = guids_in_harvest_constrained
+        else:
+            guids_in_harvest_complete = get_identifiers()
+
+        new = guids_in_harvest_constrained - guids_in_db
+        delete = guids_in_db - guids_in_harvest_complete
+        change = guids_in_db & guids_in_harvest_constrained
+
+        log.debug("|new GUIDs|: %s" % len(new))
+        log.debug("|deleted GUIDs|: %s" % len(delete))
+        log.debug("|changed GUIDs|: %s" % len(change))
 
         ids = []
         for guid in new:
