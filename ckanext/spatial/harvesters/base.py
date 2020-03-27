@@ -26,7 +26,7 @@ from ckan.lib.navl.validators import not_empty
 from ckan.lib.search.index import PackageSearchIndex
 
 from ckanext.harvest.harvesters.base import HarvesterBase
-from ckanext.harvest.model import HarvestObject
+from ckanext.harvest.model import HarvestObject, HarvestObjectExtra
 
 from ckanext.spatial.validation import Validators, all_validators
 from ckanext.spatial.model import ISODocument
@@ -567,7 +567,18 @@ class SpatialHarvester(HarvesterBase):
             return False
 
         if package_dict == 'skip':
-            log.info('Skipping import for object {0}'.format(harvest_object.id))
+            log.info('Skipping import for object %s', harvest_object.id)
+            error = context.get('error')
+            if error:
+                log.info('because: %s', error)
+                harvest_object.extras.append(HarvestObjectExtra(key='error', value=error))
+                context.update({
+                    'ignore_auth': True,
+                })
+                p.toolkit.get_action('package_delete')(context, {'id': harvest_object.package_id})
+                log.info('Deleted package {0} with guid {1}'.format(harvest_object.package_id, harvest_object.guid))
+                return True
+
             return 'unchanged'
 
         # Create / update the package
