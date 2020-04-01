@@ -567,16 +567,17 @@ class SpatialHarvester(HarvesterBase):
             return False
 
         if package_dict == 'skip':
-            log.info('Skipping import for object %s', harvest_object.id)
+            log.info('Skipping import for object %s (package id: %s)', harvest_object.id, harvest_object.package_id)
             error = context.get('error')
             if error:
                 log.info('because: %s', error)
-                harvest_object.extras.append(HarvestObjectExtra(key='error', value=error))
-                context.update({
-                    'ignore_auth': True,
-                })
-                p.toolkit.get_action('package_delete')(context, {'id': harvest_object.package_id})
-                log.info('Deleted package {0} with guid {1}'.format(harvest_object.package_id, harvest_object.guid))
+                if harvest_object.package_id:
+                    harvest_object.extras.append(HarvestObjectExtra(key='error', value=error))
+                    context.update({
+                        'ignore_auth': True,
+                    })
+                    p.toolkit.get_action('package_delete')(context, {'id': harvest_object.package_id})
+                    log.info('Deleted package {0} with guid {1}'.format(harvest_object.package_id, harvest_object.guid))
                 return True
 
             return 'unchanged'
